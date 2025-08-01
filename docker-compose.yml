@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  # Main Shakespeare Chatbot Application
+  shakespeare-chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TRAINING_ITERS: 5000
+        MODEL_SIZE: standard
+    container_name: shakespeare-chatbot
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persist model data between container restarts
+      - ./models:/app/models
+      - ./data:/app/data
+      # Optional: mount logs directory
+      - ./logs:/app/logs
+    environment:
+      - PYTHONPATH=/app
+      - MODEL_PATH=/app/models/shakespeare_model
+      - DATA_PATH=/app/data/shakespeare
+      - PORT=8080
+      - HOST=0.0.0.0
+      - FLASK_DEBUG=false
+    restart: unless-stopped
+    networks:
+      - shakespeare-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Optional: Training Service (for distributed training)
+  shakespeare-trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder  # Use builder stage for training
+    container_name: shakespeare-trainer
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - PYTHONPATH=/app
+      - CUDA_VISIBLE_DEVICES=0  # Specify GPU if available
+    command: ["python", "src/train.py", "--max_iters", "10000"]
+    networks:
+      - shakespeare-network
+    # Only run training service when explicitly called
+    profiles:
+      - training
+
+  # Optional: Monitoring with Weights & Biases
+  wandb-agent:
+    image: wandb/local
+    container_name: shakespeare-wandb
+    ports:
+      - "8081:8080"
+    volumes:
+      - wandb_data:/vol
+    environment:
+      - WANDB_BASE_URL=http://localhost:8081
+    networks:
+      - shakespeare-network
+    profiles:
+      - monitoring
+
+  # Optional: Nginx Reverse Proxy for Production
+  nginx:
+    image: nginx:alpine
+    container_name: shakespeare-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - shakespeare-chatbot
+    networks:
+      - shakespeare-network
+    profiles:
+      - production
+
+  # Optional: Redis for Session Management (if needed)
+  redis:
+    image: redis:alpine
+    container_name: shakespeare-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - shakespeare-network
+    profiles:
+      - cache
+
+networks:
+  shakespeare-network:
+    driver: bridge
+    name: shakespeare-network
+
+volumes:
+  wandb_data:
+    name: shakespeare_wandb_data
+  redis_data:
+    name: shakespeare_redis_data
+
+# Development override - use this for development
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+---
+# docker-compose.dev.yml (inline for convenience)
+version: '3.8'
+
+services:
+  shakespeare-chatbot:
+    build:
+      target: builder  # Use builder stage for development
+    volumes:
+      # Mount source code for live reloading
+      - ./src:/app/src
+      - ./templates:/app/templates
+      - ./static:/app/static
+      - ./config:/app/config
+    environment:
+      - FLASK_DEBUG=true
+      - PYTHONDONTWRITEBYTECODE=1
+    ports:
+      - "5000:8080"  # Use different port for dev
+    command: ["python", "src/chat_interface.py"]
+    # Override healthcheck for faster development feedback
+    healthcheck:
+      interval: 10s
+      start_period: 30s
