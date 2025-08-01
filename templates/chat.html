@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shakespeare Chatbot - Converse with the Bard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="title-section">
+                    <h1><i class="fas fa-theater-masks"></i> Shakespeare Chatbot</h1>
+                    <p class="subtitle">Converse with the Bard of Avon</p>
+                </div>
+                <div class="status-section">
+                    <div class="status-indicator" id="statusIndicator">
+                        <span class="status-dot"></span>
+                        <span id="statusText">Connecting...</span>
+                    </div>
+                    <button class="settings-btn" id="settingsBtn" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Settings Panel -->
+        <div class="settings-panel" id="settingsPanel">
+            <div class="settings-content">
+                <h3><i class="fas fa-sliders-h"></i> Generation Settings</h3>
+                <div class="setting-group">
+                    <label for="temperatureSlider">Temperature: <span id="temperatureValue">0.8</span></label>
+                    <input type="range" id="temperatureSlider" min="0.1" max="2.0" step="0.1" value="0.8">
+                    <small>Lower = more predictable, Higher = more creative</small>
+                </div>
+                <div class="setting-group">
+                    <label for="maxLengthSlider">Max Length: <span id="maxLengthValue">100</span></label>
+                    <input type="range" id="maxLengthSlider" min="50" max="300" step="10" value="100">
+                    <small>Maximum number of characters to generate</small>
+                </div>
+                <div class="setting-actions">
+                    <button class="btn btn-secondary" id="resetSettings">Reset Defaults</button>
+                    <button class="btn btn-primary" id="saveSettings">Save Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div class="chat-container">
+            <!-- Chat Messages -->
+            <div class="messages" id="messages">
+                <div class="message bot-message welcome-message">
+                    <div class="message-avatar">
+                        <i class="fas fa-feather-alt"></i>
+                    </div>
+                    <div class="message-content">
+                        <div class="message-text">
+                            <p><strong>Greetings, good sir or madam!</strong></p>
+                            <p>I am William Shakespeare, brought to life through the art of machine learning. Pray tell, what would you have me speak of? Love? Tragedy? The follies of mankind?</p>
+                            <p><em>Try asking me something in Elizabethan style, or simply speak as you would - I shall respond in kind!</em></p>
+                        </div>
+                        <div class="message-time">
+                            <span id="welcomeTime"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                <div class="message-avatar">
+                    <i class="fas fa-feather-alt"></i>
+                </div>
+                <div class="typing-content">
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <span class="typing-text">The Bard is composing...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-container">
+            <div class="input-wrapper">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        id="messageInput" 
+                        placeholder="Speak thy mind, and I shall answer in verse..."
+                        maxlength="500"
+                        autocomplete="off"
+                    >
+                    <button id="sendButton" class="send-btn" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="input-actions">
+                    <button class="action-btn" id="sampleBtn" title="Generate Sample Text">
+                        <i class="fas fa-dice"></i>
+                        <span>Sample</span>
+                    </button>
+                    <button class="action-btn" id="clearBtn" title="Clear Conversation">
+                        <i class="fas fa-broom"></i>
+                        <span>Clear</span>
+                    </button>
+                    <div class="char-count">
+                        <span id="charCount">0</span>/500
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>Loading Shakespeare's wisdom...</p>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div class="modal" id="errorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+                <button class="modal-close" id="modalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="errorMessage">Something went wrong. Please try again.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="modalOk">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel">
+        <button class="info-toggle" id="infoToggle" title="Information">
+            <i class="fas fa-info-circle"></i>
+        </button>
+        <div class="info-content" id="infoContent">
+            <h4>About This Chatbot</h4>
+            <p>This chatbot uses a GPT model trained on Shakespeare's complete works. It's powered by nanoGPT and generates responses in the style of the Bard.</p>
+            <h5>Tips for Better Conversations:</h5>
+            <ul>
+                <li>Try speaking in Elizabethan style: "How art thou?"</li>
+                <li>Ask about themes in Shakespeare's works</li>
+                <li>Request poems or soliloquies</li>
+                <li>Discuss philosophy, love, or nature</li>
+            </ul>
+            <h5>Example Prompts:</h5>
+            <ul>
+                <li>"Tell me about love"</li>
+                <li>"What think you of the stars?"</li>
+                <li>"Compose a sonnet about spring"</li>
+                <li>"HAMLET: To be or not to be..."</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
